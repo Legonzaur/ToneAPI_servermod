@@ -11,7 +11,7 @@
         },
         {
             "Name": "Tone_URI",
-            "DefaultValue": "https://tone.sleepycat.date/v2"
+            "DefaultValue": "https://tone.sleepycat.date/v3/server"
         },
         {
             "Name": "Tone_token",
