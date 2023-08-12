@@ -56,8 +56,7 @@ function killstat_Begin() {
 
 void
 
-function killstat_Record(entity victim, entity attacker,
-	var damageInfo) {
+function killstat_Record(entity victim, entity attacker, var damageInfo) {
 	if (!victim.IsPlayer() || !attacker.IsPlayer() || GetGameState() != eGameState.Playing)
 		return
 	// if(file.matchId)
@@ -342,7 +341,7 @@ function Tone_HTTP_Request(HttpRequest request, void functionref(HttpRequestResp
 }
 
 string
-function getPlayerPassive1(player entity) {
+function getPlayerPassive1(entity player) {
 	foreach(string passive in passive1Names) {
 		if (PlayerHasPassive(player, passive)) {
 			return passive
@@ -352,7 +351,7 @@ function getPlayerPassive1(player entity) {
 }
 
 string
-function getPlayerPassive2(player entity) {
+function getPlayerPassive2(entity player) {
 	foreach(string passive in passive2Names) {
 		if (PlayerHasPassive(player, passive)) {
 			return passive
