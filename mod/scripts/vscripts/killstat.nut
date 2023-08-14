@@ -22,7 +22,9 @@ function killstat_Init() {
 	file.Tone_URI = GetConVarString("Tone_URI")
 	file.Tone_token = GetConVarString("Tone_token")
 	file.connected = false
-
+    if(GetMapName() == "mp_lobby") {
+        return
+    }
 	//Test auth and print result to console when server start
 	Tone_Test_Auth()
 
@@ -37,9 +39,11 @@ function killstat_Init() {
 
 string prefix = "\x1b[38;5;81m[TONE API]\x1b[0m "
 
-void
+bool function hasCustomAirAccel(){
+    return Code_GetCurrentPlaylistVarOrUseValue("custom_air_accel_pilot", "null") != "null"
+}
 
-function JoinMessage(entity player) {
+void function JoinMessage(entity player) {
 	//Chat_ServerPrivateMessage(player, prefix + "This server collects data using the Tone API. Check your data here: \x1b[34mtoneapi.com/" + player.GetPlayerName()+ "\x1b[0m", false, false)
 	Chat_ServerPrivateMessage(player, prefix + "This server collects data using the WIP Tone API. View statistics at https://toneapi.github.io/ToneAPI_webclient/", false, false)
 }
@@ -95,7 +99,7 @@ function killstat_Record(entity victim, entity attacker, var damageInfo) {
 
 	table values = {
 		killstat_version = file.killstatVersion
-		match_id = file.matchId
+		match_id = int(file.matchId)
 		game_time = Time()
 		player_count = GetPlayerArray().len()
 		cause_of_death = damageName
@@ -107,28 +111,28 @@ function killstat_Record(entity victim, entity attacker, var damageInfo) {
 			cloaked = attacker.IsCloaked(true)
 			state = GetMovementState(attacker)
 			current_weapon = {
-				name = GetWeaponName(attacker.GetLatestPrimaryWeapon())
+				id = GetWeaponName(attacker.GetLatestPrimaryWeapon())
 				mods = GetWeaponMods(attacker.GetLatestPrimaryWeapon())
 			}
 			loadout = {
 				primary = {
-					name = GetWeaponName(aw1)
+					id = GetWeaponName(aw1)
 					mods = GetWeaponMods(aw1)
 				}
 				secondary = {
-					name = GetWeaponName(aw2)
+					id = GetWeaponName(aw2)
 					mods = GetWeaponMods(aw2)
 				}
 				anti_titan = {
-					name = GetWeaponName(aw3)
+					id = GetWeaponName(aw3)
 					mods = GetWeaponMods(aw3)
 				}
 				ordnance = {
-					name = GetWeaponName(aow1)
+					id = GetWeaponName(aow1)
 					mods = GetWeaponMods(aow1)
 				}
 				tactical = {
-					name = GetWeaponName(aow2)
+					id = GetWeaponName(aow2)
 					mods = GetWeaponMods(aow2)
 				}
                 passive1 = getPlayerPassive1(attacker)
@@ -143,28 +147,28 @@ function killstat_Record(entity victim, entity attacker, var damageInfo) {
 			cloaked = victim.IsCloaked(true)
 			state = GetMovementState(victim)
 			current_weapon = {
-				name = GetWeaponName(victim.GetLatestPrimaryWeapon())
+				id = GetWeaponName(victim.GetLatestPrimaryWeapon())
 				mods = GetWeaponMods(victim.GetLatestPrimaryWeapon())
 			}
 			loadout = {
 				primary = {
-					name = GetWeaponName(vw1)
+					id = GetWeaponName(vw1)
 					mods = GetWeaponMods(vw1)
 				}
 				secondary = {
-					name = GetWeaponName(vw2)
+					id = GetWeaponName(vw2)
 					mods = GetWeaponMods(vw2)
 				}
 				anti_titan = {
-					name = GetWeaponName(vw3)
+					id = GetWeaponName(vw3)
 					mods = GetWeaponMods(vw3)
 				}
 				ordnance = {
-					name = GetWeaponName(vow1)
+					id = GetWeaponName(vow1)
 					mods = GetWeaponMods(vow1)
 				}
 				tactical = {
-					name = GetWeaponName(vow2)
+					id = GetWeaponName(vow2)
 					mods = GetWeaponMods(vow2)
 				}
                 passive1 = getPlayerPassive1(victim)
@@ -177,7 +181,7 @@ function killstat_Record(entity victim, entity attacker, var damageInfo) {
 
 	HttpRequest request
 	request.method = HttpRequestMethod.POST
-	request.url = file.Tone_URI + "/server/kill"
+	request.url = file.Tone_URI + "/kill"
 	request.body = EncodeJSON(values)
 
 	Tone_HTTP_Request(
@@ -241,13 +245,20 @@ function GetNthWeapon(array < entity > weapons, int index) {
 	return index < weapons.len() ? weapons[index] : null
 }
 
-string
-function GetWeaponName(entity weapon) {
-	string s = "null"
+var function GetWeaponData(entity weapon){
+    if(weapon != null) {
+        return {
+            id = weapon.GetWeaponClassName()
+            mods = weapon.GetModBitField()
+        }
+    }
+    return null
+}
+var function GetWeaponName(entity weapon) {
 	if (weapon != null) {
-		s = weapon.GetWeaponClassName()
+		return weapon.GetWeaponClassName()
 	}
-	return s
+    return null
 }
 
 int
@@ -260,15 +271,16 @@ function GetWeaponMods(entity weapon) {
 	return modBits
 }
 
-string
-function GetTitan(entity player) {
-	if (!player.IsTitan()) return "null"
-	return GetTitanCharacterName(player)
+var function GetTitan(entity player) {
+	if (player.IsTitan()){
+        return GetTitanCharacterName(player)
+    }
+    return null
 }
 
 void
 function Log(string s) {
-	print(prefix + " " + s)
+	print(prefix + s)
 }
 
 void
@@ -280,7 +292,7 @@ function Tone_Test_Auth() {
 		request,
 		void
 		function(HttpRequestResponse response) {
-			Log("Tone API Online !")
+			Log("Tone API Initialized")
 			file.connected = true
 		}
 	)
@@ -293,23 +305,24 @@ function Tone_Register_Match() {
 	request.method = HttpRequestMethod.POST
 	request.url = file.Tone_URI + "/match"
 	request.body = EncodeJSON({
-		gameMode = GameRules_GetGameMode()
-		map = StringReplace(GetMapName(), "mp_", "")
-		servername = GetConVarString("ns_server_name")
+		gamemode = GameRules_GetGameMode()
+		game_map = StringReplace(GetMapName(), "mp_", "")
+		server_name = GetConVarString("ns_server_name")
+        air_accel = hasCustomAirAccel()
 	})
 	Tone_HTTP_Request(
 		request,
 		void
 		function(HttpRequestResponse response) {
-			Log("match ID : " + response.body)
-			file.matchId = response.body
+            table data = DecodeJSON(response.body)
+			Log("match ID : " + string(expect int(data.match)))
+			file.matchId = string(expect int(data.match))
 		}
 	)
 }
 
 
-void
-function Tone_HTTP_Request(HttpRequest request, void functionref(HttpRequestResponse) cbSuccess) {
+void function Tone_HTTP_Request(HttpRequest request, void functionref(HttpRequestResponse) cbSuccess) {
 	if (!request.method) request.method = HttpRequestMethod.POST
 	if (request.url == "") {
 		Log("[ERRR] Couldn't find URI for request. This should be reported")
@@ -326,37 +339,43 @@ function Tone_HTTP_Request(HttpRequest request, void functionref(HttpRequestResp
 			if (response.statusCode == 200 || response.statusCode == 201) {
 				cbSuccess(response)
 			} else {
-				Log("[WARN] Something might be wrong with your token")
-				Log("[WARN]" + response.statusCode)
-				Log("[WARN]" + response.body)
+                if(response.statusCode == 401){
+                    Log("[WARN] Something might be wrong with your token")
+                }else{
+                    Log("[WARN] Something went wrong ! You'd better report this")
+                }
+				Log("[WARN] " + response.statusCode)
+				Log("[WARN] " + response.body)
 			}
 		},
 		void
 		function(HttpRequestFailure failure) {
 			Log("[WARN] Couldn't request the server! ToneAPI may be down.")
-			Log("[WARN]" + failure.errorCode)
-			Log("[WARN]" + failure.errorMessage)
+			Log("[WARN] " + failure.errorCode)
+			Log("[WARN] " + failure.errorMessage)
 		}
 	)
 }
 
-string
-function getPlayerPassive1(entity player) {
-	foreach(string passive in passive1Names) {
-		if (PlayerHasPassive(player, passive)) {
-			return passive
+var function getPlayerPassive1(entity player) {
+    foreach (string key, int val in ePassives){
+        if (PlayerHasPassive(player, val)) {
+            if(passive1Names.find(key) != -1){
+                return key
+            }
 		}
-	}
+    }
     return null
 }
 
-string
-function getPlayerPassive2(entity player) {
-	foreach(string passive in passive2Names) {
-		if (PlayerHasPassive(player, passive)) {
-			return passive
+var function getPlayerPassive2(entity player) {
+    foreach (string key, int val in ePassives){
+        if (PlayerHasPassive(player, val)) {
+            if(passive2Names.find(key) != -1){
+                return key
+            }
 		}
-	}
+    }
     return null
 }
 
