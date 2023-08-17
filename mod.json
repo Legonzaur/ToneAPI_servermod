@@ -2,7 +2,7 @@
     "Name": "fvnkhead.killstat",
     "Description": "Gather kill statistics and sends them to Tone API server.",
     "Version": "3.0.2",
-    "LoadPriority": 1,
+    "LoadPriority": 2,
     "RequiredOnClient": false,
     "ConVars": [
         {
@@ -23,6 +23,13 @@
         }
     ],
     "Scripts": [
+        {
+            "Path": "matchstat.nut",
+            "RunOn": "SERVER",
+            "ServerCallback": {
+                "After": "matchStat_Init"
+            }
+        },
         {
             "Path": "killstat.nut",
             "RunOn": "SERVER",
