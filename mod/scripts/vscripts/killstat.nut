@@ -1,6 +1,4 @@
-global
-
-function killstat_Init
+global function killstat_Init
 
 struct {
 	string killstatVersion
