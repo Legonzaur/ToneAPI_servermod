@@ -48,9 +48,6 @@ void function OnWeaponFired(entity weapon, WeaponPrimaryAttackParams attackParam
 }
 
 void function OnDamage( entity victim, var damageInfo){
-    // if(!victim.IsPlayer()){
-    //     return
-    // }
     entity player = DamageInfo_GetAttacker( damageInfo )
 
     if(!IsValid(player) || !player.IsPlayer()){
@@ -81,9 +78,6 @@ void function OnDamage( entity victim, var damageInfo){
     if(headshot){
         file.weaponsUsed[player][weaponName].shotHeadshot++
     }
-
-    print("crit " + string(file.weaponsUsed[player][weaponName].shotCrit))
-    print("headshot " + string(file.weaponsUsed[player][weaponName].shotHeadshot))
 }
 
 void function TrackTitanWeapons( entity player ){
