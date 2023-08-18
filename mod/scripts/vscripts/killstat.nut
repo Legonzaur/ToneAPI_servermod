@@ -35,13 +35,15 @@ function killstat_Init() {
 	AddCallback_OnClientConnected(JoinMessage)
 }
 
+string prefix = "\x1b[38;5;81m[TONE API]\x1b[0m "
+
 bool function hasCustomAirAccel(){
     return Code_GetCurrentPlaylistVarOrUseValue("custom_air_accel_pilot", "null") != "null"
 }
 
 void function JoinMessage(entity player) {
-	//Chat_ServerPrivateMessage(player, killstat_prefix + "This server collects data using the Tone API. Check your data here: \x1b[34mtoneapi.com/" + player.GetPlayerName()+ "\x1b[0m", false, false)
-	Chat_ServerPrivateMessage(player, killstat_prefix + "This server collects data using the WIP Tone API. View statistics at https://toneapi.github.io/ToneAPI_webclient/", false, false)
+	//Chat_ServerPrivateMessage(player, prefix + "This server collects data using the Tone API. Check your data here: \x1b[34mtoneapi.com/" + player.GetPlayerName()+ "\x1b[0m", false, false)
+	Chat_ServerPrivateMessage(player, prefix + "This server collects data using the WIP Tone API. View statistics at https://toneapi.github.io/ToneAPI_webclient/", false, false)
 }
 
 void
@@ -272,6 +274,11 @@ var function GetTitan(entity player) {
         return GetTitanCharacterName(player)
     }
     return null
+}
+
+void
+function Log(string s) {
+	print(prefix + s)
 }
 
 void
