@@ -24,6 +24,10 @@
     ],
     "Scripts": [
         {
+            "Path": "toneapi_shared.nut",
+            "RunOn": "SERVER"
+        },
+        {
             "Path": "matchstat.nut",
             "RunOn": "SERVER",
             "ServerCallback": {
