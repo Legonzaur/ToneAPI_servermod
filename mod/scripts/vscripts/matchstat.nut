@@ -1,33 +1,28 @@
 global function matchstat_Init
 
-struct weaponStats {
-    int shotsFired
-    int shotsHit
-    int shotCrit
-    int shotHeadshot
-    int shotRichochet
-}
+typedef weaponStats table <string, int>
 
 struct {
-    table < entity, table < string, weaponStats > > weaponsUsed
+    table < string, table < string, weaponStats > > weaponsUsed
 } file
 
 void function matchstat_Init(){
-    // AddCallback_OnPlayerRespawned( TrackWeapons )
     WeaponFireCallbacks_AddCallbackOnOwnerClassFired("player", OnWeaponFired)
     AddDamageCallback("player", OnDamage)
+    AddCallback_GameStateEnter(eGameState.Postmatch, ToneAPI_CloseMatch)
 }
 
 void function OnWeaponFired(entity weapon, WeaponPrimaryAttackParams attackParams, var ammoUsed){
     entity player = weapon.GetOwner()
     string weaponName = weapon.GetWeaponClassName()
-    if(!player.IsPlayer()){
+    if(!IsValid(player) || !player.IsPlayer()){
         return
     }
-    if(!(player in file.weaponsUsed)){
-        file.weaponsUsed[player] <- {}
+    string playerUID = player.GetUID()
+    if(!(playerUID in file.weaponsUsed)){
+        file.weaponsUsed[playerUID] <- {}
     }
-    if(!(weaponName in file.weaponsUsed[player])){
+    if(!(weaponName in file.weaponsUsed[playerUID])){
         weaponStats stats = {
             shotsFired = 0,
             shotsHit = 0,
@@ -35,9 +30,9 @@ void function OnWeaponFired(entity weapon, WeaponPrimaryAttackParams attackParam
             shotHeadshot = 0,
             shotRichochet = 0
         }
-        file.weaponsUsed[player][weaponName] <- stats
+        file.weaponsUsed[playerUID][weaponName] <- stats
     }
-    file.weaponsUsed[player][weaponName].shotsFired++
+    file.weaponsUsed[playerUID][weaponName].shotsFired++
 }
 
 void function OnDamage( entity victim, var damageInfo){
@@ -46,6 +41,7 @@ void function OnDamage( entity victim, var damageInfo){
     if(!IsValid(player) || !player.IsPlayer()){
         return
     }
+    string playerUID = player.GetUID()
     entity weapon = DamageInfo_GetWeapon( damageInfo )
     entity inflictor = DamageInfo_GetInflictor( damageInfo )
     string weaponName
@@ -61,10 +57,10 @@ void function OnDamage( entity victim, var damageInfo){
         }
     }
 
-    if(!(player in file.weaponsUsed)){
-        file.weaponsUsed[player] <- {}
+    if(!(playerUID in file.weaponsUsed)){
+        file.weaponsUsed[playerUID] <- {}
     }
-    if(!(weaponName in file.weaponsUsed[player])){
+    if(!(weaponName in file.weaponsUsed[playerUID])){
         weaponStats stats = {
             shotsFired = 0,
             shotsHit = 0,
@@ -72,22 +68,47 @@ void function OnDamage( entity victim, var damageInfo){
             shotHeadshot = 0,
             shotRichochet = 0
         }
-        file.weaponsUsed[player][weaponName] <- stats
+        file.weaponsUsed[playerUID][weaponName] <- stats
     }
-    file.weaponsUsed[player][weaponName].shotsHit++
+    file.weaponsUsed[playerUID][weaponName].shotsHit++
     int damageType = DamageInfo_GetCustomDamageType( damageInfo )
     bool crit = bool( damageType & DF_CRITICAL )
     bool headshot = bool( damageType & DF_HEADSHOT )
     if(crit){
-        file.weaponsUsed[player][weaponName].shotCrit++
+        file.weaponsUsed[playerUID][weaponName].shotCrit++
     }
     if(headshot){
-        file.weaponsUsed[player][weaponName].shotHeadshot++
+        file.weaponsUsed[playerUID][weaponName].shotHeadshot++
     }
-    if ( inflictor && inflictor instanceof CProjectile && inflictor.IsProjectile() ){
+    if ( inflictor && inflictor.IsProjectile() ){
         if(inflictor.proj.projectileBounceCount > 1){
-            file.weaponsUsed[player][weaponName].shotRichochet++
+            file.weaponsUsed[playerUID][weaponName].shotRichochet++
         }
     }
 
+}
+
+void function ToneAPI_CloseMatch(){
+    if(!toneapi_data.matchId){
+		ToneAPI_Log("[ERRR] Match is not registered!")
+		return
+	}
+
+    HttpRequest request
+	request.method = HttpRequestMethod.POST
+	request.url = toneapi_data.Tone_URI + "/match/" + string(toneapi_data.matchId) + "/close"
+	request.body = EncodeJSON(file.weaponsUsed)
+    print(request.body)
+    foreach(string stuff, weaponStats stuff2 in file.weaponsUsed["1005930844007"]){
+        print(stuff)
+        print(EncodeJSON(stuff2))
+    }
+    print("ok")
+
+
+	Tone_HTTP_Request(
+		request,
+		void
+		function(HttpRequestResponse response) {}
+	)
 }
