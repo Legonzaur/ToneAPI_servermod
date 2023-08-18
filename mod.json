@@ -11,11 +11,11 @@
         },
         {
             "Name": "Tone_URI",
-            "DefaultValue": "https://tone.sleepycat.date/v3_test/server"
+            "DefaultValue": "https://tone.sleepycat.date/v3/server"
         },
         {
             "Name": "Tone_token",
-            "DefaultValue": "YTZhMGRjYTctMDNjYi00Y2Y3LWJkYTktMTRlNTQxNDNhYjI2"
+            "DefaultValue": "CHECK_NORTHSTAR_WIKI_INSTRUCTIONS_ABOUT_CONVARS"
         },
         {
             "Name": "killstat_custom_parameters",
@@ -23,10 +23,6 @@
         }
     ],
     "Scripts": [
-        {
-            "Path": "killstat_shared.nut",
-            "RunOn": "SERVER"
-        },
         {
             "Path": "matchstat.nut",
             "RunOn": "SERVER",
