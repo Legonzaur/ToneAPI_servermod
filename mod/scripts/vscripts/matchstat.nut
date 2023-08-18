@@ -1,29 +1,21 @@
-global function matchStat_Init
+global function matchstat_Init
 
 struct weaponStats {
     int shotsFired
     int shotsHit
     int shotCrit
     int shotHeadshot
+    int shotRichochet
 }
 
 struct {
     table < entity, table < string, weaponStats > > weaponsUsed
 } file
 
-void function matchStat_Init(){
+void function matchstat_Init(){
     // AddCallback_OnPlayerRespawned( TrackWeapons )
-    AddCallback_OnPlayerGetsNewPilotLoadout( TrackWeaponsOnChange )
-    AddCallback_OnPilotBecomesTitan( TrackTitanWeaponOnBecome )
+    WeaponFireCallbacks_AddCallbackOnOwnerClassFired("player", OnWeaponFired)
     AddDamageCallback("player", OnDamage)
-}
-
-void function TrackWeapons( entity player ) {
-    array<entity> weapons = player.GetMainWeapons()
-    array<entity> offhand = player.GetOffhandWeapons()
-    foreach(entity weapon in weapons){
-        WeaponFireCallbacks_AddCallbackOnWeaponFired(weapon, OnWeaponFired)
-    }
 }
 
 void function OnWeaponFired(entity weapon, WeaponPrimaryAttackParams attackParams, var ammoUsed){
@@ -40,7 +32,8 @@ void function OnWeaponFired(entity weapon, WeaponPrimaryAttackParams attackParam
             shotsFired = 0,
             shotsHit = 0,
             shotCrit = 0,
-            shotHeadshot = 0
+            shotHeadshot = 0,
+            shotRichochet = 0
         }
         file.weaponsUsed[player][weaponName] <- stats
     }
@@ -54,7 +47,19 @@ void function OnDamage( entity victim, var damageInfo){
         return
     }
     entity weapon = DamageInfo_GetWeapon( damageInfo )
-    string weaponName = weapon.GetWeaponClassName()
+    entity inflictor = DamageInfo_GetInflictor( damageInfo )
+    string weaponName
+    if(weapon){
+        weaponName = weapon.GetWeaponClassName()
+    }
+    else{
+        if ( inflictor && inflictor instanceof CProjectile && inflictor.IsProjectile() ){
+            weaponName = inflictor.ProjectileGetWeaponClassName()
+        }else{
+            ToneAPI_Log("[ERRR] Couldn't get weapon information")
+            return
+        }
+    }
 
     if(!(player in file.weaponsUsed)){
         file.weaponsUsed[player] <- {}
@@ -64,7 +69,8 @@ void function OnDamage( entity victim, var damageInfo){
             shotsFired = 0,
             shotsHit = 0,
             shotCrit = 0,
-            shotHeadshot = 0
+            shotHeadshot = 0,
+            shotRichochet = 0
         }
         file.weaponsUsed[player][weaponName] <- stats
     }
@@ -78,16 +84,10 @@ void function OnDamage( entity victim, var damageInfo){
     if(headshot){
         file.weaponsUsed[player][weaponName].shotHeadshot++
     }
-}
+    if ( inflictor && inflictor instanceof CProjectile && inflictor.IsProjectile() ){
+        if(inflictor.proj.projectileBounceCount > 1){
+            file.weaponsUsed[player][weaponName].shotRichochet++
+        }
+    }
 
-void function TrackTitanWeapons( entity player ){
-    TrackWeapons( player )
-}
-
-void function TrackWeaponsOnChange( entity player, PilotLoadoutDef loadout ) {
-    TrackWeapons( player )
-}
-
-void function TrackTitanWeaponOnBecome( entity player, entity titan ){
-    TrackTitanWeapons( player )
 }

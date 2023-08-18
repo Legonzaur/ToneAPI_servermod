@@ -1,66 +1,20 @@
 global function killstat_Init
 
-struct {
-	string killstatVersion
-	string Tone_URI
-	string Tone_protocol
-	string Tone_token
-	bool connected
-
-	string matchId
-	string gameMode
-	string map
-}
-file
-
-void
-
-function killstat_Init() {
-	file.killstatVersion = GetConVarString("killstat_version")
-	file.Tone_URI = GetConVarString("Tone_URI")
-	file.Tone_token = GetConVarString("Tone_token")
-	file.connected = false
+void function killstat_Init() {
     if(GetMapName() == "mp_lobby") {
         return
     }
-	//Test auth and print result to console when server start
-	Tone_Test_Auth()
-
-	//We should probably blacklist mp_lobby this
-	Tone_Register_Match()
-	// callbacks
-	AddCallback_GameStateEnter(eGameState.Playing, killstat_Begin)
 	AddCallback_OnPlayerKilled(killstat_Record)
-	AddCallback_GameStateEnter(eGameState.Postmatch, killstat_End)
-	AddCallback_OnClientConnected(JoinMessage)
 }
 
-bool function hasCustomAirAccel(){
-    return Code_GetCurrentPlaylistVarOrUseValue("custom_air_accel_pilot", "null") != "null"
-}
-
-void function JoinMessage(entity player) {
-	//Chat_ServerPrivateMessage(player, killstat_prefix + "This server collects data using the Tone API. Check your data here: \x1b[34mtoneapi.com/" + player.GetPlayerName()+ "\x1b[0m", false, false)
-	Chat_ServerPrivateMessage(player, killstat_prefix + "This server collects data using the WIP Tone API. View statistics at https://toneapi.github.io/ToneAPI_webclient/", false, false)
-}
-
-void
-
-function killstat_Begin() {
-	//TODO : request MatchID from API ------------------------------------------------------------------------------------------------
-	//TODO : request anonymization data from API
-
-	Log("-----BEGIN KILLSTAT-----")
-	Log("Sending kill data to " + file.Tone_URI + "/kill")
-}
-
-void
-
-function killstat_Record(entity victim, entity attacker, var damageInfo) {
+void function killstat_Record(entity victim, entity attacker, var damageInfo) {
 	if (!victim.IsPlayer() || !attacker.IsPlayer() || GetGameState() != eGameState.Playing)
 		return
-	// if(file.matchId)
-	//     return
+	if(!toneapi_data.matchId){
+		ToneAPI_Log("[ERRR] Match is not registered!")
+		return
+	}
+
 
 
 	table attackerValues = {}
@@ -94,8 +48,8 @@ function killstat_Record(entity victim, entity attacker, var damageInfo) {
 	float dist = Distance(attacker.GetOrigin(), victim.GetOrigin())
 
 	table values = {
-		killstat_version = file.killstatVersion
-		match_id = int(file.matchId)
+		version = toneapi_data.version
+		match_id = toneapi_data.matchId
 		game_time = Time()
 		player_count = GetPlayerArray().len()
 		cause_of_death = damageName
@@ -177,7 +131,7 @@ function killstat_Record(entity victim, entity attacker, var damageInfo) {
 
 	HttpRequest request
 	request.method = HttpRequestMethod.POST
-	request.url = file.Tone_URI + "/kill"
+	request.url = toneapi_data.Tone_URI + "/kill"
 	request.body = EncodeJSON(values)
 
 	Tone_HTTP_Request(
@@ -187,15 +141,7 @@ function killstat_Record(entity victim, entity attacker, var damageInfo) {
 	)
 }
 
-void
-
-function killstat_End() {
-	Log("-----END KILLSTAT-----")
-}
-
-string
-
-function GetMovementState(entity player) {
+string function GetMovementState(entity player) {
 	Assert(IsPilot(player))
 	//IsPhaseShifted
 	//IsStanding
@@ -216,9 +162,7 @@ function GetMovementState(entity player) {
 // 1. primary
 // 2. secondary
 // 3. anti-titan
-int
-
-function MainWeaponSort(entity a, entity b) {
+int function MainWeaponSort(entity a, entity b) {
 	int aID = a.GetDamageSourceID()
 	int bID = b.GetDamageSourceID()
 
@@ -236,8 +180,7 @@ function MainWeaponSort(entity a, entity b) {
 	return aIdx < bIdx ? -1 : 1
 }
 
-entity
-function GetNthWeapon(array < entity > weapons, int index) {
+entity function GetNthWeapon(array < entity > weapons, int index) {
 	return index < weapons.len() ? weapons[index] : null
 }
 
@@ -272,80 +215,6 @@ var function GetTitan(entity player) {
         return GetTitanCharacterName(player)
     }
     return null
-}
-
-void
-function Tone_Test_Auth() {
-	HttpRequest request
-	request.method = HttpRequestMethod.POST
-	request.url = file.Tone_URI + "/"
-	Tone_HTTP_Request(
-		request,
-		void
-		function(HttpRequestResponse response) {
-			Log("Tone API Initialized")
-			file.connected = true
-		}
-	)
-}
-
-
-void
-function Tone_Register_Match() {
-	HttpRequest request
-	request.method = HttpRequestMethod.POST
-	request.url = file.Tone_URI + "/match"
-	request.body = EncodeJSON({
-		gamemode = GameRules_GetGameMode()
-		game_map = StringReplace(GetMapName(), "mp_", "")
-		server_name = GetConVarString("ns_server_name")
-        air_accel = hasCustomAirAccel()
-	})
-	Tone_HTTP_Request(
-		request,
-		void
-		function(HttpRequestResponse response) {
-            table data = DecodeJSON(response.body)
-			Log("match ID : " + string(expect int(data.match)))
-			file.matchId = string(expect int(data.match))
-		}
-	)
-}
-
-
-void function Tone_HTTP_Request(HttpRequest request, void functionref(HttpRequestResponse) cbSuccess) {
-	if (!request.method) request.method = HttpRequestMethod.POST
-	if (request.url == "") {
-		Log("[ERRR] Couldn't find URI for request. This should be reported")
-		return
-	}
-	request.headers = {
-		Authorization = ["Bearer " + file.Tone_token]
-	}
-
-	NSHttpRequest(
-		request,
-		void
-		function(HttpRequestResponse response): (cbSuccess) {
-			if (response.statusCode == 200 || response.statusCode == 201) {
-				cbSuccess(response)
-			} else {
-                if(response.statusCode == 401){
-                    Log("[WARN] Something might be wrong with your token")
-                }else{
-                    Log("[WARN] Something went wrong ! You'd better report this")
-                }
-				Log("[WARN] " + response.statusCode)
-				Log("[WARN] " + response.body)
-			}
-		},
-		void
-		function(HttpRequestFailure failure) {
-			Log("[WARN] Couldn't request the server! ToneAPI may be down.")
-			Log("[WARN] " + failure.errorCode)
-			Log("[WARN] " + failure.errorMessage)
-		}
-	)
 }
 
 var function getPlayerPassive1(entity player) {
