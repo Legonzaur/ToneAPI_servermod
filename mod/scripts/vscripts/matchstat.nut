@@ -1,7 +1,5 @@
 global function matchstat_Init
 
-typedef weaponStats table <string, var>
-// typedef playerWeaponStats table < string, weaponStats >
 typedef playerSpecificStats table < string, var >
 typedef playerStats table < string, playerSpecificStats >
 typedef players table < string, playerStats >
@@ -20,13 +18,16 @@ void function matchstat_Init(){
 }
 
 var function incrementVar(var value){
-    return expect int(value) + 1
+    return expect float(value) + 1
 }
 
-void function CreatePlayer(string playerUID){
+void function CreatePlayer(entity player){
+    string playerUID = player.GetUID()
     if(!(playerUID in file.weaponsUsed)){
+        var playerName = player.GetPlayerName()
         file.weaponsUsed[playerUID] <- {}
         file.weaponsUsed[playerUID].weapons <- {}
+        file.weaponsUsed[playerUID].titans <- {}
         file.weaponsUsed[playerUID].stats <- {}
         file.weaponsUsed[playerUID].stats.distance <- {
             ground = 0.0,
@@ -41,17 +42,37 @@ void function CreatePlayer(string playerUID){
     }
 }
 
-void function CreateWeaponStats(string weaponName, string playerUID){
-    CreatePlayer(playerUID)
+void function CreateWeaponStats(string weaponName, entity player){
+    CreatePlayer(player)
+    string playerUID = player.GetUID()
     if(!(weaponName in file.weaponsUsed[playerUID].weapons)){
-        weaponStats stats = {
-            shotsFired = 0,
-            shotsHit = 0,
-            shotsCrit = 0,
-            shotsHeadshot = 0,
-            shotsRichochet = 0
+        // Has to make ints floats because you can't mix types apparently
+        playerSpecificStats stats = {
+            shotsFired = 0.0,
+            shotsHit = 0.0,
+            shotsCrit = 0.0,
+            shotsHeadshot = 0.0,
+            shotsRichochet = 0.0,
+            playtime = 0.0
         }
         file.weaponsUsed[playerUID].weapons[weaponName] <- stats
+    }
+}
+
+void function CreateTitanStats(string titanName, entity player){
+    CreatePlayer(player)
+    string playerUID = player.GetUID()
+    if(!(titanName in file.weaponsUsed[playerUID].titans)){
+        // Has to make ints floats because you can't mix types apparently
+        playerSpecificStats stats = {
+            shotsFired = 0.0,
+            shotsHit = 0.0,
+            shotsCrit = 0.0,
+            shotsHeadshot = 0.0,
+            shotsRichochet = 0.0,
+            playtime = 0.0
+        }
+        file.weaponsUsed[playerUID].titans[titanName] <- stats
     }
 }
 
@@ -62,8 +83,13 @@ void function OnWeaponFired(entity weapon, WeaponPrimaryAttackParams attackParam
         return
     }
     string playerUID = player.GetUID()
-    CreateWeaponStats(weaponName, playerUID)
+    CreateWeaponStats(weaponName, player)
     file.weaponsUsed[playerUID].weapons[weaponName].shotsFired = incrementVar(file.weaponsUsed[playerUID].weapons[weaponName].shotsFired)
+    if(player.IsTitan()){
+        string titanName = GetTitanCharacterName(player)
+        CreateTitanStats(titanName, player)
+        file.weaponsUsed[playerUID].titans[titanName].shotsFired = incrementVar(file.weaponsUsed[playerUID].titans[titanName].shotsFired)
+    }
 }
 
 void function OnDamage( entity victim, var damageInfo){
@@ -87,30 +113,45 @@ void function OnDamage( entity victim, var damageInfo){
             return
         }
     }
-
-    CreateWeaponStats(weaponName, playerUID)
+    CreateWeaponStats(weaponName, player)
     file.weaponsUsed[playerUID].weapons[weaponName].shotsHit = incrementVar(file.weaponsUsed[playerUID].weapons[weaponName].shotsHit)
+    if(player.IsTitan()){
+        string titanName = GetTitanCharacterName(player)
+        CreateTitanStats(titanName, player)
+        file.weaponsUsed[playerUID].titans[titanName].shotsHit = incrementVar(file.weaponsUsed[playerUID].titans[titanName].shotsHit)
+    }
     int damageType = DamageInfo_GetCustomDamageType( damageInfo )
     bool crit = bool( damageType & DF_CRITICAL )
     bool headshot = bool( damageType & DF_HEADSHOT )
-    if(crit){
-        file.weaponsUsed[playerUID].weapons[weaponName].shotsCrit = incrementVar(file.weaponsUsed[playerUID].weapons[weaponName].shotsCrit)
-    }
-    if(headshot){
-        file.weaponsUsed[playerUID].weapons[weaponName].shotsHeadshot = incrementVar(file.weaponsUsed[playerUID].weapons[weaponName].shotsCrit)
+    // if(crit){
+    //     file.weaponsUsed[playerUID].weapons[weaponName].shotsCrit = incrementVar(file.weaponsUsed[playerUID].weapons[weaponName].shotsCrit)
+    //     if(player.IsTitan()){
+    //         file.weaponsUsed[playerUID].titans[titanName].shotsCrit = incrementVar(file.weaponsUsed[playerUID].titans[titanName].shotsCrit)
+    //     }
+    // }
+    if(headshot || crit){
+        file.weaponsUsed[playerUID].weapons[weaponName].shotsHeadshot = incrementVar(file.weaponsUsed[playerUID].weapons[weaponName].shotsHeadshot)
+        if(player.IsTitan()){
+            string titanName = GetTitanCharacterName(player)
+            file.weaponsUsed[playerUID].titans[titanName].shotsHeadshot = incrementVar(file.weaponsUsed[playerUID].titans[titanName].shotsHeadshot)
+        }
     }
     if ( inflictor && inflictor.IsProjectile() ){
         if(inflictor.proj.projectileBounceCount > 1){
-            file.weaponsUsed[playerUID].weapons[weaponName].shotsRichochet = incrementVar(file.weaponsUsed[playerUID].weapons[weaponName].shotsCrit)
+            file.weaponsUsed[playerUID].weapons[weaponName].shotsRichochet = incrementVar(file.weaponsUsed[playerUID].weapons[weaponName].shotsRichochet)
+            if(player.IsTitan()){
+                string titanName = GetTitanCharacterName(player)
+                file.weaponsUsed[playerUID].titans[titanName].shotsRichochet = incrementVar(file.weaponsUsed[playerUID].titans[titanName].shotsRichochet)
+            }
         }
-    }
-
+    }  
+    
 }
 
 
 void function TrackPlayer(entity player) {
     string playerUID = player.GetUID()
-    CreatePlayer(playerUID)
+    CreatePlayer(player)
     thread TrackPlayer_Threaded(player)
 }
 
@@ -123,30 +164,45 @@ void function TrackPlayer_Threaded(entity player){
 	player.EndSignal( "OnDeath" )
     vector position = player.GetOrigin()
     string playerUID = player.GetUID()
+    float interval = 0.2
     while(true){
-        wait 0.2
+        wait interval
         // Hmm
         Assert( IsValid( player ) )
         if(!IsValid(player)) return
 
-        if( player.IsTitan() || !player.IsPlayer()) continue
         // Ugly, should probably use flags
         if(GetGameState() == eGameState.WinnerDetermined) return
 
-        // Could be a little inaccurate but should work fine if interval is small enough
-        vector diff = position - player.GetOrigin()
-        if(player.IsWallRunning()){
-            file.weaponsUsed[playerUID].stats.time.wall = expect float(file.weaponsUsed[playerUID].stats.time.wall) + 0.2
-            file.weaponsUsed[playerUID].stats.distance.wall = expect float(file.weaponsUsed[playerUID].stats.distance.wall) + Length(diff)
+        entity weapon = player.GetActiveWeapon()
+        if(weapon){
+            string weaponName = weapon.GetWeaponClassName()
+            CreateWeaponStats(weaponName, player)
+            file.weaponsUsed[playerUID].weapons[weaponName].playtime = expect float(file.weaponsUsed[playerUID].weapons[weaponName].playtime) + interval
+        }else{
+            CreatePlayer(player)
         }
-        else if(!player.IsOnGround()){ 
-            file.weaponsUsed[playerUID].stats.time.air = expect float(file.weaponsUsed[playerUID].stats.time.air) + 0.2
-            file.weaponsUsed[playerUID].stats.distance.air = expect float(file.weaponsUsed[playerUID].stats.distance.air) + Length(diff)
+
+        if(player.IsTitan()){
+            string titanName = GetTitanCharacterName(player)
+            CreateTitanStats(titanName, player)
+            file.weaponsUsed[playerUID].titans[titanName].playtime = expect float(file.weaponsUsed[playerUID].titans[titanName].playtime) + interval
+        }else if(player.IsPlayer()){
+            // Could be a little inaccurate but should work fine if interval is small enough
+            if(player.IsWallRunning()){
+                file.weaponsUsed[playerUID].stats.time.wall = expect float(file.weaponsUsed[playerUID].stats.time.wall) + interval
+                file.weaponsUsed[playerUID].stats.distance.wall = expect float(file.weaponsUsed[playerUID].stats.distance.wall) + Distance(position, player.GetOrigin())
+            }
+            else if(!player.IsOnGround()){ 
+                file.weaponsUsed[playerUID].stats.time.air = expect float(file.weaponsUsed[playerUID].stats.time.air) + interval
+                file.weaponsUsed[playerUID].stats.distance.air = expect float(file.weaponsUsed[playerUID].stats.distance.air) + Distance(position, player.GetOrigin())
+            }
+            else{
+                file.weaponsUsed[playerUID].stats.time.ground = expect float(file.weaponsUsed[playerUID].stats.time.ground) + interval
+                file.weaponsUsed[playerUID].stats.distance.ground = expect float(file.weaponsUsed[playerUID].stats.distance.ground) + Distance(position, player.GetOrigin())
+            }
         }
-        else{
-            file.weaponsUsed[playerUID].stats.time.ground = expect float(file.weaponsUsed[playerUID].stats.time.ground) + 0.2
-            file.weaponsUsed[playerUID].stats.distance.ground = expect float(file.weaponsUsed[playerUID].stats.distance.ground) + Length(diff)
-        }
+        
         position = player.GetOrigin()
     }
 }

@@ -35,6 +35,7 @@ void function toneapi_Init(){
 	Tone_Register_Match()
 
     AddCallback_OnClientConnected(JoinMessage)
+	// AddCallback_OnClientConnected(RegisterPlayer)
 }
 
 void function JoinMessage(entity player) {
