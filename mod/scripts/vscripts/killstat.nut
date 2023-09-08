@@ -55,7 +55,6 @@ void function killstat_Record(entity victim, entity attacker, var damageInfo) {
 		cause_of_death = damageName
 		distance = dist
 		attacker = {
-			name = attacker.GetPlayerName()
 			id = attacker.GetUID()
 			velocity = Distance( < 0, 0, 0 > , attacker.GetVelocity())
 			cloaked = attacker.IsCloaked(true)
@@ -91,7 +90,6 @@ void function killstat_Record(entity victim, entity attacker, var damageInfo) {
 			}
 		}
 		victim = {
-			name = victim.GetPlayerName()
 			id = victim.GetUID()
 			velocity = Distance( < 0, 0, 0 > , victim.GetVelocity())
 			cloaked = victim.IsCloaked(true)
